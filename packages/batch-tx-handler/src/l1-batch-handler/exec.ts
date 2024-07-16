@@ -81,5 +81,5 @@ export const startL1BatchHandler = async (
   console.log(
     `Get all ${txHash.length} l2 transaction and ${l2Msgs.length} blocks in this batch, writing tx to ${args.outputFile}`,
   );
-  fs.writeFileSync(args.outputFile, txHash.toString());
+  fs.writeFileSync(args.outputFile, txHash.reverse().join('\n').toString());
 };
