@@ -92,12 +92,21 @@ export const getAllL2Msgs = async (
         segment = brotli.decompress(Buffer.from(segment));
       }
       l2Msgs.push(segment);
-    }
-    if (kind === BatchSegmentKindDelayedMessages) {
+    } else if (kind === BatchSegmentKindDelayedMessages) {
       //MessageDelivered
       l2Msgs.push(await getDelayedTx(currentDelayedMessageIndex));
       currentDelayedMessageIndex -= 1;
+    } else if (kind === 3) { // BatchSegmentKindAdvanceTimestamp
+      // Uint8Array to number
+      l2segments[i][0] = 103
+      l2Msgs.push(l2segments[i])
+      // console.log('BatchSegmentKindAdvanceTimestamp', segment)
+    } else if (kind === 4) { // BatchSegmentKindAdvanceL1BlockNumber
+      l2segments[i][0] = 104
+      l2Msgs.push(l2segments[i])
+      // console.log('BatchSegmentKindAdvanceL1BlockNumber', segment)
     }
+
   }
 
   if (l2Msgs.length > MaxL2MessageSize) {
@@ -115,7 +124,7 @@ export const decodeL2Msgs = (l2Msgs: Uint8Array): string[] => {
     const serializedTransaction = l2Msgs.subarray(1); // remove kind tag
     const tx = ethers.utils.parseTransaction(serializedTransaction);
     const currentHash = tx.hash!; // calculate tx hash
-    txHash.push(currentHash);
+    txHash.push(JSON.stringify(tx));
   } else if (kind === L2MessageKind_Batch) {
     const remainData: Uint8Array = l2Msgs.subarray(1);
     const lengthOfData = remainData.length;
@@ -132,7 +141,19 @@ export const decodeL2Msgs = (l2Msgs: Uint8Array): string[] => {
   } else if (kind === delayedMsgToBeAdded) {
     const remainData: Uint8Array = l2Msgs.subarray(1);
     const currentHash = ethers.utils.hexlify(remainData);
-    txHash.push(currentHash);
+    txHash.push(JSON.stringify(remainData));
+  } else if (kind === 103) {
+    const remainData: Uint8Array = l2Msgs.subarray(1);
+    const decoded = rlp.decode(remainData)
+    const n = BigNumber.from(decoded).toString();
+    txHash.push(JSON.stringify({'BatchSegmentKindAdvanceTimestamp': n}));
+  } else if (kind === 104) {
+    const remainData: Uint8Array = l2Msgs.subarray(1);
+    const decoded = rlp.decode(remainData)
+    const n = BigNumber.from(decoded).toString();
+    txHash.push(JSON.stringify({'BatchSegmentKindAdvanceL1BlockNumber': n}));
+  } else {
+    console.log('unknown l2msg kind:', kind)
   }
   return txHash;
 };
